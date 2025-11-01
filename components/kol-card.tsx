@@ -3,14 +3,26 @@
 import type { KOL } from "@/lib/types"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Eye, Video, DollarSign, TrendingUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Users, Eye, Video, DollarSign, TrendingUp, XCircle, CheckCircle, Mail, Plus, ExternalLink } from "lucide-react"
 import Image from "next/image"
 
 interface KOLCardProps {
   kol: KOL
+  isExcluded?: boolean
+  onToggleExclude?: () => void
+  isIncluded?: boolean
+  onToggleInclude?: () => void
 }
 
-export function KOLCard({ kol }: KOLCardProps) {
+export function KOLCard({
+  kol,
+  isExcluded = false,
+  onToggleExclude,
+  isIncluded = false,
+  onToggleInclude,
+}: KOLCardProps) {
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
@@ -79,14 +91,47 @@ export function KOLCard({ kol }: KOLCardProps) {
     }
   }
 
+  const hasContactInfo = () => {
+    if (!kol.socials) return false
+    try {
+      const socialsData = typeof kol.socials === "string" ? JSON.parse(kol.socials) : kol.socials
+      return (
+        (Array.isArray(socialsData.emails) && socialsData.emails.length > 0) ||
+        (Array.isArray(socialsData.twitter) && socialsData.twitter.length > 0) ||
+        (Array.isArray(socialsData.telegram) && socialsData.telegram.length > 0)
+      )
+    } catch (e) {
+      return false
+    }
+  }
+
   const viewsPercentiles = getViewsPercentiles()
   const engagementPercentiles = getEngagementPercentiles()
   const languages = getLanguages()
   const archetypes = getArchetypes()
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card
+      className={`overflow-hidden hover:shadow-lg transition-shadow ${
+        isExcluded
+          ? "border-2 border-destructive bg-destructive/5"
+          : isIncluded
+            ? "border-2 border-primary bg-primary/5"
+            : ""
+      }`}
+    >
       <CardHeader className="p-4 pb-3">
+        {(isExcluded || isIncluded) && (
+          <div className="flex gap-1.5 mb-2">
+            {isExcluded && (
+              <Badge variant="destructive" className="text-xs">
+                Excluded
+              </Badge>
+            )}
+            {isIncluded && <Badge className="text-xs bg-primary">In Campaign</Badge>}
+          </div>
+        )}
+
         <div className="flex items-start gap-3">
           <div className="relative w-14 h-14 flex-shrink-0">
             {kol.thumbnail_url ? (
@@ -120,22 +165,43 @@ export function KOLCard({ kol }: KOLCardProps) {
                   🗣️ {languages.primary.toUpperCase()}
                 </Badge>
               )}
+              {hasContactInfo() && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                  <Mail className="h-3 w-3 mr-1" />
+                  Contact Available
+                </Badge>
+              )}
             </div>
           </div>
         </div>
         {(archetypes?.primary || archetypes?.secondary) && (
-          <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t">
-            {archetypes?.primary && (
-              <Badge variant="outline" className="text-xs">
-                {archetypes.primary}
-              </Badge>
-            )}
-            {archetypes?.secondary && (
-              <Badge variant="outline" className="text-xs opacity-75">
-                {archetypes.secondary}
-              </Badge>
-            )}
-          </div>
+          <TooltipProvider>
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex flex-wrap gap-1.5">
+                    {archetypes?.primary && (
+                      <Badge variant="outline" className="text-xs cursor-help">
+                        {archetypes.primary}
+                      </Badge>
+                    )}
+                    {archetypes?.secondary && (
+                      <Badge variant="outline" className="text-xs opacity-75 cursor-help">
+                        {archetypes.secondary}
+                      </Badge>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Content Creator Archetype</p>
+                  <p className="text-sm">
+                    Describes the creator's content style and approach. Primary archetype is their main style, secondary
+                    is their supporting style.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         )}
       </CardHeader>
       <CardContent className="p-4 pt-0 space-y-3">
@@ -190,12 +256,68 @@ export function KOLCard({ kol }: KOLCardProps) {
         </div>
 
         {/* Price Section */}
-        <div className="flex items-center justify-between py-2 border-t bg-muted/30 -mx-4 px-4 -mb-4">
+        <div className="flex items-center justify-between py-2 border-t bg-muted/30 -mx-4 px-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="h-4 w-4" />
             <span className="text-sm font-medium">Price per Video</span>
           </div>
           <span className="font-bold text-lg text-primary">${formatNumber(kol.price || 0)}</span>
+        </div>
+
+        {/* Action Buttons Footer Section */}
+        <div className="space-y-2 pt-3 border-t -mx-4 px-4 -mb-4 pb-4">
+          {/* View Channel - Full Width Top Row */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`https://www.youtube.com/channel/${kol.channel_id}`, "_blank")}
+            className="w-full"
+            title="Open YouTube Channel"
+          >
+            <ExternalLink className="h-4 w-4 mr-1.5" />
+            View Channel
+          </Button>
+
+          {/* Campaign Actions - Bottom Row */}
+          <div className="flex gap-2">
+            <Button
+              variant={isIncluded ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleInclude}
+              className="flex-1"
+              disabled={isExcluded}
+            >
+              {isIncluded ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-1.5" />
+                  In Campaign
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add to Campaign
+                </>
+              )}
+            </Button>
+            <Button
+              variant={isExcluded ? "destructive" : "outline"}
+              size="sm"
+              onClick={onToggleExclude}
+              className="flex-1"
+            >
+              {isExcluded ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-1.5" />
+                  Excluded
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-1.5" />
+                  Exclude
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

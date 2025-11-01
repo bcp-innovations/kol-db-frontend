@@ -1,6 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { KOL } from "@/lib/types"
 
+function getP50Views(kol: KOL): number {
+  if (!kol.views) return 0
+
+  try {
+    const viewsData = typeof kol.views === "string" ? JSON.parse(kol.views) : kol.views
+    // Check for both possible key formats
+    return viewsData.p50 || viewsData.views_p50 || 0
+  } catch {
+    return 0
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { kols, budget } = await request.json()
@@ -9,42 +21,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request parameters" }, { status: 400 })
     }
 
-    // Optimization algorithm: Maximize views within budget
-    // This is a greedy algorithm that selects KOLs with the best views-per-dollar ratio
+    // Extract channel IDs from KOLs
+    const channel_ids = kols.map((kol: KOL) => kol.channel_id)
 
-    // Calculate efficiency (views per dollar) for each KOL
-    const kolsWithEfficiency = kols
-      .filter((kol: KOL) => kol.price > 0 && kol.view_count > 0)
-      .map((kol: KOL) => ({
-        ...kol,
-        efficiency: kol.view_count / kol.price,
-      }))
-      .sort((a, b) => b.efficiency - a.efficiency)
+    // Call external optimization API
+    const optimizationResponse = await fetch("https://c10e98e90302.ngrok-free.app/select-kols", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        budget: budget,
+        channel_ids: channel_ids,
+      }),
+    })
 
-    // Greedy selection: pick KOLs with best efficiency until budget is exhausted
-    const optimizedKols: KOL[] = []
-    let remainingBudget = budget
-
-    for (const kol of kolsWithEfficiency) {
-      if (kol.price <= remainingBudget) {
-        optimizedKols.push(kol)
-        remainingBudget -= kol.price
-      }
+    if (!optimizationResponse.ok) {
+      throw new Error(`Optimization API returned ${optimizationResponse.status}`)
     }
 
-    // If no KOLs fit the budget, return the most efficient ones that are affordable
-    if (optimizedKols.length === 0) {
-      const affordableKols = kolsWithEfficiency.filter((kol: KOL) => kol.price <= budget)
-      if (affordableKols.length > 0) {
-        optimizedKols.push(affordableKols[0])
-      }
-    }
+    const apiResponse = await optimizationResponse.json()
+    const { channel_ids: selectedChannelIds, expected_views, total_cost } = apiResponse
+
+    // Filter KOLs to only include selected channel IDs
+    const optimizedKols = kols.filter((kol: KOL) => selectedChannelIds.includes(kol.channel_id))
 
     return NextResponse.json({
       optimizedKols,
-      totalCost: optimizedKols.reduce((sum, kol) => sum + kol.price, 0),
-      totalViews: optimizedKols.reduce((sum, kol) => sum + kol.view_count, 0),
-      remainingBudget,
+      budget: budget,
+      total_cost: total_cost,
+      expected_views: expected_views,
+      remainingBudget: budget - total_cost,
+      // Legacy fields for backwards compatibility
+      totalCost: total_cost,
+      totalViews: expected_views,
     })
   } catch (error) {
     console.error("Optimization error:", error)

@@ -1,10 +1,30 @@
+"use client"
+
 import type { KOL } from "@/lib/types"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, DollarSign, TrendingUp, Eye, Globe } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Users,
+  DollarSign,
+  TrendingUp,
+  Eye,
+  Globe,
+  XCircle,
+  CheckCircle,
+  Mail,
+  Plus,
+  ExternalLink,
+  Target,
+} from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface KOLListItemProps {
   kol: KOL
+  isExcluded?: boolean
+  onToggleExclude?: () => void
+  isIncluded?: boolean
+  onToggleInclude?: () => void
 }
 
 function formatNumber(num: number): string {
@@ -31,7 +51,13 @@ function getEngagementPercentiles(engagement: any) {
   }
 }
 
-export function KOLListItem({ kol }: KOLListItemProps) {
+export function KOLListItem({
+  kol,
+  isExcluded = false,
+  onToggleExclude,
+  isIncluded = false,
+  onToggleInclude,
+}: KOLListItemProps) {
   const viewsPercentiles = getViewsPercentiles(kol.views)
   const engagementPercentiles = getEngagementPercentiles(kol.engagement_rate)
 
@@ -39,8 +65,30 @@ export function KOLListItem({ kol }: KOLListItemProps) {
   const primaryLanguage = kol.language && typeof kol.language === "object" ? kol.language.primary_language : null
   const secondaryLanguage = kol.language && typeof kol.language === "object" ? kol.language.secondary_language : null
 
+  const hasContactInfo = () => {
+    if (!kol.socials) return false
+    try {
+      const socialsData = typeof kol.socials === "string" ? JSON.parse(kol.socials) : kol.socials
+      return (
+        (Array.isArray(socialsData.emails) && socialsData.emails.length > 0) ||
+        (Array.isArray(socialsData.twitter) && socialsData.twitter.length > 0) ||
+        (Array.isArray(socialsData.telegram) && socialsData.telegram.length > 0)
+      )
+    } catch (e) {
+      return false
+    }
+  }
+
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card
+      className={`p-4 hover:shadow-md transition-shadow ${
+        isExcluded
+          ? "border-2 border-destructive bg-destructive/5"
+          : isIncluded
+            ? "border-2 border-primary bg-primary/5"
+            : ""
+      }`}
+    >
       <div className="flex items-start gap-4">
         {/* Thumbnail */}
         <img
@@ -54,30 +102,93 @@ export function KOLListItem({ kol }: KOLListItemProps) {
           {/* Header */}
           <div className="flex items-start justify-between gap-4 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg truncate">{kol.title || "Unknown Channel"}</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold text-lg truncate">{kol.title || "Unknown Channel"}</h3>
+                {isExcluded && (
+                  <Badge variant="destructive" className="text-xs">
+                    Excluded
+                  </Badge>
+                )}
+                {isIncluded && <Badge className="text-xs bg-primary">In Campaign</Badge>}
+                {hasContactInfo() && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    <Mail className="h-3 w-3 mr-1" />
+                    Contact
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mt-1">
                 {kol.category && (
                   <Badge variant="secondary" className="text-xs">
                     {kol.category}
                   </Badge>
                 )}
-                {primaryArchetype && (
-                  <Badge variant="outline" className="text-xs">
-                    {primaryArchetype}
-                  </Badge>
-                )}
               </div>
             </div>
 
-            {/* Price - Prominent */}
-            <div className="flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-lg flex-shrink-0">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <span className="font-bold text-lg">${formatNumber(kol.price || 0)}</span>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Price - Prominent */}
+              <div className="flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-lg">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <span className="font-bold text-lg">${formatNumber(kol.price || 0)}</span>
+              </div>
+
+              {/* View Channel button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://www.youtube.com/channel/${kol.channel_id}`, "_blank")}
+                className="h-9"
+                title="Open YouTube Channel"
+              >
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                View Channel
+              </Button>
+
+              <Button
+                variant={isIncluded ? "default" : "ghost"}
+                size="sm"
+                onClick={onToggleInclude}
+                className="h-9"
+                disabled={isExcluded}
+              >
+                {isIncluded ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Added
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant={isExcluded ? "destructive" : "ghost"}
+                size="sm"
+                onClick={onToggleExclude}
+                className="h-9"
+              >
+                {isExcluded ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Include
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Exclude
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
           {/* Metrics Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-3">
             {/* Subscribers */}
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -116,6 +227,28 @@ export function KOLListItem({ kol }: KOLListItemProps) {
                 </div>
               </div>
             </div>
+
+            {/* Archetype - with tooltip on entire cell */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-help">
+                    <Target className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{primaryArchetype || "N/A"}</div>
+                      <div className="text-xs text-muted-foreground">Archetype</div>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Content Creator Archetype</p>
+                  <p className="text-sm">
+                    Describes the creator's content style and approach (e.g., Broadcaster, Educator, Entertainer,
+                    Community).
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Location & Language */}
             <div className="flex items-center gap-2">
