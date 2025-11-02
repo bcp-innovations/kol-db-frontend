@@ -56,6 +56,8 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
   const [sortBy, setSortBy] = useState<SortOption>("subscribers-desc")
   const [showFilters, setShowFilters] = useState(true)
   const [showFilterPrompt, setShowFilterPrompt] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
 
   const filterOptions = useMemo(() => {
     const categories = new Set<string>()
@@ -186,6 +188,15 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
 
   const displayKols = optimizedKols || sortedKols
 
+  const totalPages = Math.ceil(displayKols.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedKols = displayKols.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filters, sortBy, optimizedKols])
+
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.minSubscribers) count++
@@ -253,6 +264,7 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
 
     setIsOptimizing(true)
     setIsOptimizationStale(false)
+    setCurrentPage(1)
     try {
       const response = await fetch("/api/optimize-kols", {
         method: "POST",
@@ -778,6 +790,11 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
                 {filteredKols.length !== kols.length && !optimizedKols && (
                   <p className="text-sm text-muted-foreground mt-1">Filtered from {kols.length} total KOLs</p>
                 )}
+                {displayKols.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Showing {startIndex + 1}-{Math.min(endIndex, displayKols.length)} of {displayKols.length}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -836,32 +853,131 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
                   )}
                 </div>
               </Card>
-            ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {displayKols.map((kol) => (
-                  <KOLCard
-                    key={kol.channel_id}
-                    kol={kol}
-                    isExcluded={excludedKols.has(kol.channel_id)}
-                    onToggleExclude={() => toggleExcludeKol(kol.channel_id)}
-                    isIncluded={includedKols.has(kol.channel_id)}
-                    onToggleInclude={() => toggleIncludeKol(kol.channel_id)}
-                  />
-                ))}
-              </div>
             ) : (
-              <div className="space-y-4">
-                {displayKols.map((kol) => (
-                  <KOLListItem
-                    key={kol.channel_id}
-                    kol={kol}
-                    isExcluded={excludedKols.has(kol.channel_id)}
-                    onToggleExclude={() => toggleExcludeKol(kol.channel_id)}
-                    isIncluded={includedKols.has(kol.channel_id)}
-                    onToggleInclude={() => toggleIncludeKol(kol.channel_id)}
-                  />
-                ))}
-              </div>
+              <>
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {paginatedKols.map((kol) => (
+                      <KOLCard
+                        key={kol.channel_id}
+                        kol={kol}
+                        isExcluded={excludedKols.has(kol.channel_id)}
+                        onToggleExclude={() => toggleExcludeKol(kol.channel_id)}
+                        isIncluded={includedKols.has(kol.channel_id)}
+                        onToggleInclude={() => toggleIncludeKol(kol.channel_id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {paginatedKols.map((kol) => (
+                      <KOLListItem
+                        key={kol.channel_id}
+                        kol={kol}
+                        isExcluded={excludedKols.has(kol.channel_id)}
+                        onToggleExclude={() => toggleExcludeKol(kol.channel_id)}
+                        isIncluded={includedKols.has(kol.channel_id)}
+                        onToggleInclude={() => toggleIncludeKol(kol.channel_id)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {totalPages > 1 && (
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="per-page" className="text-sm text-muted-foreground whitespace-nowrap">
+                        Per page:
+                      </Label>
+                      <Select
+                        value={itemsPerPage.toString()}
+                        onValueChange={(value) => {
+                          setItemsPerPage(Number.parseInt(value))
+                          setCurrentPage(1)
+                        }}
+                      >
+                        <SelectTrigger id="per-page" className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {/* Show first page */}
+                        {currentPage > 3 && (
+                          <>
+                            <Button
+                              variant={currentPage === 1 ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(1)}
+                              className="w-10"
+                            >
+                              1
+                            </Button>
+                            {currentPage > 4 && <span className="text-muted-foreground px-1">...</span>}
+                          </>
+                        )}
+
+                        {/* Show pages around current page */}
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter((page) => {
+                            return page === currentPage || (page >= currentPage - 2 && page <= currentPage + 2)
+                          })
+                          .map((page) => (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="w-10"
+                            >
+                              {page}
+                            </Button>
+                          ))}
+
+                        {/* Show last page */}
+                        {currentPage < totalPages - 2 && (
+                          <>
+                            {currentPage < totalPages - 3 && <span className="text-muted-foreground px-1">...</span>}
+                            <Button
+                              variant={currentPage === totalPages ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(totalPages)}
+                              className="w-10"
+                            >
+                              {totalPages}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </main>
         </div>
