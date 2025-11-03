@@ -381,7 +381,10 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
     if (views >= 1000000) {
       return `${(views / 1000000).toFixed(1)}M`
     }
-    return `${(views / 1000).toFixed(1)}K`
+    if (views >= 1000) {
+      return `${(views / 1000).toFixed(1)}K`
+    }
+    return `${views}`
   }
 
   const toggleExcludeKol = (channelId: string) => {
@@ -671,10 +674,28 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
                         <Eye className="h-3 w-3" />
                         Expected Views
                       </div>
-                      <div className="text-xl font-bold">
-                        {formatViews(optimizationResults.expected_views || optimizationResults.totalViews || 0)}
-                      </div>
-                      <div className="text-xs text-green-600">Optimized reach</div>
+                      {typeof optimizationResults.expected_views === "object" &&
+                      optimizationResults.expected_views.mean ? (
+                        <>
+                          <div className="text-xl font-bold">
+                            {formatViews(optimizationResults.expected_views.mean)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Range: {formatViews(optimizationResults.expected_views.p10)} -{" "}
+                            {formatViews(optimizationResults.expected_views.p90)}
+                          </div>
+                          <div className="text-xs text-green-600 mt-1">
+                            Median: {formatViews(optimizationResults.expected_views.p50)}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold">
+                            {formatViews(optimizationResults.expected_views || optimizationResults.totalViews || 0)}
+                          </div>
+                          <div className="text-xs text-green-600">Optimized reach</div>
+                        </>
+                      )}
                     </div>
 
                     <div className="p-3 rounded-lg bg-card border">
@@ -686,7 +707,9 @@ export function KOLDiscovery({ initialKols }: KOLDiscoveryProps) {
                         $
                         {(
                           (optimizationResults.total_cost || optimizationResults.totalCost || 0) /
-                          (optimizationResults.expected_views || optimizationResults.totalViews || 1)
+                          (typeof optimizationResults.expected_views === "object"
+                            ? optimizationResults.expected_views.mean
+                            : optimizationResults.expected_views || optimizationResults.totalViews || 1)
                         ).toFixed(4)}
                       </div>
                       <div className="text-xs text-green-600">Best efficiency</div>

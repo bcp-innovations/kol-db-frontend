@@ -46,15 +46,20 @@ export async function POST(request: NextRequest) {
     // Filter KOLs to only include selected channel IDs
     const optimizedKols = kols.filter((kol: KOL) => selectedChannelIds.includes(kol.channel_id))
 
+    const viewsStats =
+      typeof expected_views === "object" && expected_views !== null
+        ? expected_views
+        : { mean: expected_views, p10: expected_views, p50: expected_views, p90: expected_views }
+
     return NextResponse.json({
       optimizedKols,
       budget: budget,
       total_cost: total_cost,
-      expected_views: expected_views,
+      expected_views: viewsStats,
       remainingBudget: budget - total_cost,
       // Legacy fields for backwards compatibility
       totalCost: total_cost,
-      totalViews: expected_views,
+      totalViews: viewsStats.mean, // Use mean for legacy field
     })
   } catch (error) {
     console.error("Optimization error:", error)

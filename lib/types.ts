@@ -30,3 +30,10 @@ export interface KOLFilters {
   language?: string[]
   searchQuery?: string
 }
+
+export interface ExpectedViewsStats {
+  mean: number
+  p10: number
+  p50: number
+  p90: number
+}
