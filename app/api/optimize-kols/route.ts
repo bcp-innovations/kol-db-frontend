@@ -21,11 +21,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request parameters" }, { status: 400 })
     }
 
+    const backendUrl = process.env.BACKEND_URL
+    if (!backendUrl) {
+      console.error("BACKEND_URL environment variable is not set")
+      return NextResponse.json({ error: "Backend URL not configured" }, { status: 500 })
+    }
+
+    const cleanBackendUrl = backendUrl.replace(/\/$/, "")
+
     // Extract channel IDs from KOLs
     const channel_ids = kols.map((kol: KOL) => kol.channel_id)
 
-    // Call external optimization API
-    const optimizationResponse = await fetch("https://c10e98e90302.ngrok-free.app/select-kols", {
+    const optimizationResponse = await fetch(`${cleanBackendUrl}/select-kols`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,6 +41,7 @@ export async function POST(request: NextRequest) {
         budget: budget,
         channel_ids: channel_ids,
       }),
+      redirect: "follow", // Explicitly follow redirects
     })
 
     if (!optimizationResponse.ok) {
